@@ -132,6 +132,7 @@ class AppAgenda(ctk.CTk):
             ("Categorías", "📁"),
             ("Eventos", "📆"),
             ("Ubicaciones", "📌"),
+            ("Rankings", "📊"),
             ("Tareas", "✅")
         ], start=2):
             btn = ctk.CTkButton(
@@ -146,7 +147,7 @@ class AppAgenda(ctk.CTk):
             self.sidebar_frame,
             text="🔄 Recargar datos",
             command=self.actualizar_todas_las_tablas
-        ).grid(row=7, column=0, padx=15, pady=(20, 5), sticky="ew")
+        ).grid(row=8, column=0, padx=15, pady=(20, 5), sticky="ew")
 
         ctk.CTkLabel(self.sidebar_frame, text="APARIENCIA", font=ctk.CTkFont(size=11, weight="bold")).grid(
             row=11, column=0, padx=20, pady=(10, 5), sticky="w"
@@ -172,13 +173,15 @@ class AppAgenda(ctk.CTk):
         self.tab_categorias = self.tabview.add("Categorías")
         self.tab_eventos = self.tabview.add("Eventos")
         self.tab_ubicaciones = self.tabview.add("Ubicaciones")
+        self.tab_reportes = self.tabview.add("Rankings")
         self.tab_tareas = self.tabview.add("Tareas")
-
+        
         self.configurar_pestana_usuarios()
         self.configurar_pestana_categorias()
         self.configurar_pestana_eventos()
         self.configurar_pestana_ubicaciones()
         self.configurar_pestana_tareas()
+        self.configurar_pestana_reportes()
         self.seleccionar_modulo("Usuarios")
 
     def al_cambiar_pestana(self):
@@ -211,7 +214,7 @@ class AppAgenda(ctk.CTk):
         # Crea el encabezado
         self.crear_encabezado(self.tab_ubicaciones, "Ubicaciones", "Registra, consulta y administra las ubicaciones para tus eventos.")
 
-        # Crea una tabla de 1 fila y 2 columnas que rellenan el espacio en una relacion de 3 a 1
+        # Crea una tabla y se definen las filas y columnas. Se expanden al tamaño de la pantalla
         cuerpo = ctk.CTkFrame(self.tab_ubicaciones, fg_color="transparent")
         cuerpo.pack(fill="both", expand=True, padx=10, pady=5)
 
@@ -380,6 +383,63 @@ class AppAgenda(ctk.CTk):
             messagebox.showinfo("Eliminado", "Ubicacion eliminada.")
         except Exception as e:
             messagebox.showerror("No se pudo eliminar", str(e))
+
+    # -------------------- REPORTES --------------------
+
+    def configurar_pestana_reportes(self):
+        self.crear_encabezado(self.tab_reportes, "Ranking", "Consulta sobre los recintos mas solicitados y con mayor volumen de eventos.")
+
+        cuerpo = ctk.CTkFrame(self.tab_reportes, fg_color="transparent")
+        cuerpo.pack(fill="both", expand=True, padx=10, pady=5)
+
+        cuerpo.grid_columnconfigure(0, weight=1)
+        cuerpo.grid_columnconfigure(1, weight=1)
+        cuerpo.grid_rowconfigure(0, weight=1)
+
+        tabla_frame = ctk.CTkFrame(cuerpo)
+        tabla_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+
+        tabla_frame1 = ctk.CTkFrame(cuerpo)
+        tabla_frame1.grid(row=0, column=1, sticky="nsew", padx=(0, 8))
+
+        self.tree_reporte1 = self.crear_treeview(
+            tabla_frame, ("Nombre", "Cantidad de eventos"),
+            (150, 150)
+        )
+
+        self.tree_reporte2 = self.crear_treeview(
+            tabla_frame1, ("Nombre", "Total de visitantes"),
+            (150, 150)
+        )
+
+    def cargar_datos_reportes(self):
+        try:
+            rows = self.ejecutar_consulta("""
+                select e.id_ubicacion, u.nombre, count(e.id_evento) as cantidad
+                from eventos e, ubicaciones u
+                where e.id_ubicacion = u.id_ubicacion
+                group by e.id_ubicacion, u.nombre
+                order by cantidad desc
+            """,fetch=True)
+            for item in self.tree_reporte1.get_children(): self.tree_reporte1.delete(item)
+            for row in rows:
+                self.tree_reporte1.insert("", "end", values=(row[1], row[2]))  
+        except Exception as e:
+            print(f"Error cargando Ubicaciones: {e}")
+
+        try:
+            rows = self.ejecutar_consulta("""
+                select e.id_ubicacion, u.nombre, SUM(u.capacidad) as personas
+                from eventos e, ubicaciones u
+                where e.id_ubicacion = u.id_ubicacion
+                group by e.id_ubicacion, u.nombre
+                order by personas desc
+            """,fetch=True)
+            for item in self.tree_reporte2.get_children(): self.tree_reporte2.delete(item)
+            for row in rows:
+                self.tree_reporte2.insert("", "end", values=(row[1], row[2]))  
+        except Exception as e:
+            print(f"Error cargando Ubicaciones: {e}")
 
     # -------------------- USUARIOS --------------------
 
@@ -813,6 +873,7 @@ class AppAgenda(ctk.CTk):
         self.cargar_datos_categorias()
         self.cargar_datos_ubicaciones()
         self.cargar_datos_eventos()
+        self.cargar_datos_reportes()
 
 
 if __name__ == "__main__":

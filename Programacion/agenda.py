@@ -202,12 +202,94 @@ class AppAgenda(ctk.CTk):
     def configurar_pestana_ubicaciones(self):
         self.crear_encabezado(self.tab_tareas, "Tareas", "Registra, consulta y administra las tareas pertenecientes a tu evento.")
 
-        cuerpo = ctk.CTkFrame(self.tab_tareas, fg_color="#00ffff")
+        cuerpo = ctk.CTkFrame(self.tab_tareas, fg_color="transparent")
         cuerpo.pack(fill="both", expand=True, padx=10, pady=5)
-        cuerpo.grid_columnconfigure(0, weight=3)
+        cuerpo.grid_columnconfigure(0, weight=1)
         cuerpo.grid_columnconfigure(1, weight=1)
         cuerpo.grid_rowconfigure(0, weight=1)
 
+        tabla_frame = ctk.CTkFrame(cuerpo)
+        tabla_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+
+        form = ctk.CTkScrollableFrame(cuerpo, width=350)
+        form.grid(row=0, column=1, sticky="nsew")
+
+        self.tree_tareas = self.crear_treeview(
+            tabla_frame, ("ID", "Evento", "Responsable", "Titulo", "Descripcion", "Fecha Limite", "Prioridad", "Estado"),
+            (70, 80, 160, 80, 160, 160, 80, 80)
+        )
+        self.tree_tareas.bind("<<TreeviewSelect>>", self.cargar_tarea_seleccionado)
+
+        ctk.CTkLabel(form, text="Formulario de tarea", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(10, 15))
+
+        self.entry_titulo = ctk.CTkEntry(form, placeholder_text="Titulo")
+        self.entry_titulo.pack(fill="x", padx=10, pady=6)
+        self.entry_descripcion = ctk.CTkEntry(form, placeholder_text="Descripcion")
+        self.entry_descripcion.pack(fill="x", padx=10, pady=6)
+
+        ctk.CTkLabel(form, text="Evento").pack(anchor="w", padx=10, pady=(8, 2))
+        self.combo_ev_evento = ctk.CTkComboBox(form, values=["Seleccione un evento"], state="readonly")
+        self.combo_ev_evento.set("Seleccione un evento")
+        self.combo_ev_evento.pack(fill="x", padx=10, pady=4)
+
+        ctk.CTkLabel(form, text="Responsable").pack(anchor="w", padx=10, pady=(8, 2))
+        self.combo_ev_resposable = ctk.CTkComboBox(form, values=["Seleccione un responsable"], state="readonly")
+        self.combo_ev_resposable.set("Seleccione un responsable")
+        self.combo_ev_resposable.pack(fill="x", padx=10, pady=4)
+
+        ctk.CTkLabel(form, text="Prioridad").pack(anchor="w", padx=10, pady=(8, 2))
+        self.combo_ev_prioridad = ctk.CTkComboBox(form, values=["Baja"]+["Media"]+["Alta"], state="readonly")
+        self.combo_ev_prioridad.set("Seleccione la prioridad")
+        self.combo_ev_prioridad.pack(fill="x", padx=10, pady=4)
+
+        ctk.CTkLabel(form, text="Estado").pack(anchor="w", padx=10, pady=(8, 2))
+        self.combo_ev_estado = ctk.CTkComboBox(form, values=["Pendiente"]+["En progreso"]+["Completada"]+["Cancelada"], state="readonly")
+        self.combo_ev_estado.set("Seleccione el estado")
+        self.combo_ev_estado.pack(fill="x", padx=10, pady=4)
+
+        ctk.CTkLabel(form, text="Fecha Limite").pack(anchor="w", padx=10, pady=(10, 2))
+        fila_limite = ctk.CTkFrame(form, fg_color="transparent"); fila_limite.pack(fill="x", padx=10)
+        self.fecha_limite = self.crear_selector_fecha(fila_limite)
+        self.fecha_limite.pack(side="left", fill="x", expand=True)
+        self.hora_limite = ctk.CTkEntry(fila_limite, placeholder_text="HH:MM", width=75)
+        self.hora_limite.pack(side="left", padx=(6, 0))
+
+        ctk.CTkButton(form, text="➕ Crear evento", command=self.limpiar_form_tareas).pack(fill="x", padx=10, pady=(16, 5))
+        ctk.CTkButton(form, text="💾 Actualizar seleccionado", command=self.limpiar_form_tareas).pack(fill="x", padx=10, pady=5)
+        ctk.CTkButton(form, text="🧹 Nuevo / Limpiar", command=self.limpiar_form_tareas, fg_color="gray").pack(fill="x", padx=10, pady=5)
+        ctk.CTkButton(form, text="🗑️ Eliminar seleccionado", command=self.limpiar_form_tareas, fg_color="#b33939", hover_color="#8f2d2d").pack(fill="x", padx=10, pady=5)
+
+        self.limpiar_form_tareas()
+
+    def limpiar_form_tareas(self):
+        self.tree_tareas.selection_remove(self.tree_tareas.selection())
+        self.entry_titulo.delete(0, tk.END)
+        self.entry_descripcion.delete(0, tk.END)
+        self.combo_ev_evento.set("Seleccione un evento")
+        self.combo_ev_resposable.set("Seleccione un responsable")
+        self.combo_ev_prioridad.set("Seleccione la prioridad")
+        self.combo_ev_estado.set("Seleccione el estado")
+        hoy = datetime.now()
+        self.establecer_fecha(self.fecha_limite, hoy)
+        self.hora_limite.delete(0, tk.END); self.hora_limite.insert(0, "09:00")
+
+    def cargar_tarea_seleccionado(self, _=None):
+        sel = self.tree_tareas.selection()
+        if not sel: return
+        vals = self.tree_tareas.item(sel[0])["values"]
+        self.entry_titulo.delete(0, tk.END); self.entry_titulo.insert(0, vals[3])
+        self.entry_descripcion.delete(0, tk.END); self.entry_descripcion.insert(0, vals[4])
+        self.combo_ev_evento.set(vals[1])
+        self.combo_ev_resposable.set(vals[2])
+        self.combo_ev_prioridad.set(vals[6])
+        self.combo_ev_estado.set(vals[7])
+        try:
+            limite = datetime.strptime(str(vals[5]), "%Y-%m-%d %H:%M")
+            self.establecer_fecha(self.fecha_inicio, limite)
+            self.hora_limite.delete(0, tk.END); self.hora_limite.insert(0, limite.strftime("%H:%M"))
+        except ValueError:
+            pass
+        
     # -------------------- UBICACIONES -----------------
 
     def configurar_pestana_tareas(self):

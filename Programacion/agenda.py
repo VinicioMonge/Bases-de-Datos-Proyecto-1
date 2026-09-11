@@ -198,6 +198,7 @@ class AppAgenda(ctk.CTk):
         ctk.CTkLabel(parent, text=descripcion, font=ctk.CTkFont(size=12)).pack(
             anchor="w", padx=15, pady=(0, 12)
         )
+
     # -------------------- TAREAS -----------------
 
     def configurar_pestana_ubicaciones(self):
@@ -628,18 +629,27 @@ class AppAgenda(ctk.CTk):
         cuerpo.pack(fill="both", expand=True, padx=10, pady=5)
         cuerpo.grid_columnconfigure(0, weight=3)
         cuerpo.grid_columnconfigure(1, weight=1)
+        #los pesos de las filas estan invertidos?
         cuerpo.grid_rowconfigure(0, weight=1)
+        cuerpo.grid_rowconfigure(1, weight=3)
 
         tabla_frame = ctk.CTkFrame(cuerpo)
         tabla_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        tabla_frame1 = ctk.CTkFrame(cuerpo)
+        tabla_frame1.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
         form = ctk.CTkScrollableFrame(cuerpo, width=300)
-        form.grid(row=0, column=1, sticky="nsew")
+        form.grid(row=0, column=1, rowspan=2, sticky="nsew")
 
         self.tree_usuarios = self.crear_treeview(
             tabla_frame, ("ID", "Nombre", "Apellido", "Registro", "Activo"),
-            (70, 160, 160, 160, 80)
+            (50, 160, 160, 160, 80)
         )
         self.tree_usuarios.bind("<<TreeviewSelect>>", self.cargar_usuario_seleccionado)
+
+        self.tree_usuarios_tareas = self.crear_treeview(
+            tabla_frame1, ("ID", "Tarea Pendiente", "Tiempo restante", "Prioridad"),
+            (40, 200, 80, 40)
+        )
 
         ctk.CTkLabel(form, text="Formulario de usuario", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(10, 15))
         self.entry_nombre = ctk.CTkEntry(form, placeholder_text="Nombre")
@@ -665,12 +675,26 @@ class AppAgenda(ctk.CTk):
         if not sel:
             return
         vals = self.tree_usuarios.item(sel[0])["values"]
+        self.cargar_datosextra_usuarios(vals[0])
         self.entry_nombre.delete(0, tk.END); self.entry_nombre.insert(0, vals[1])
         self.entry_apellido.delete(0, tk.END); self.entry_apellido.insert(0, vals[2])
         if vals[4]:
             self.switch_usuario_activo.select()
         else:
             self.switch_usuario_activo.deselect()
+
+    def cargar_datosextra_usuarios(self, id):
+        try:
+            rows = self.ejecutar_consulta(
+                "SELECT id_tarea, descripcion, fecha_limite - CURRENT_DATE, prioridad FROM tareas where responsable = %s AND CURRENT_DATE < fecha_limite order by fecha_limite desc", (id,),
+                fetch=True
+            )
+            for item in self.tree_usuarios_tareas.get_children(): self.tree_usuarios_tareas.delete(item)
+            for row in rows:
+                self.tree_usuarios_tareas.insert("", "end", values=(row[0], row[1], row[2], row[3]))
+                
+        except Exception as e:
+            print(f"Error cargando Ubicaciones: {e}")
 
     def limpiar_form_usuario(self):
         self.tree_usuarios.selection_remove(self.tree_usuarios.selection())
@@ -858,16 +882,25 @@ class AppAgenda(ctk.CTk):
 
         cuerpo = ctk.CTkFrame(self.tab_eventos, fg_color="transparent")
         cuerpo.pack(fill="both", expand=True, padx=10, pady=5)
-        cuerpo.grid_columnconfigure(0, weight=3); cuerpo.grid_columnconfigure(1, weight=1); cuerpo.grid_rowconfigure(0, weight=1)
+        cuerpo.grid_columnconfigure(0, weight=3)
+        cuerpo.grid_columnconfigure(1, weight=1) 
+        cuerpo.grid_rowconfigure(0, weight=1)
+        cuerpo.grid_rowconfigure(1, weight=1)
 
         tabla = ctk.CTkFrame(cuerpo); tabla.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
-        form = ctk.CTkScrollableFrame(cuerpo, width=350); form.grid(row=0, column=1, sticky="nsew")
+        tabla1 = ctk.CTkFrame(cuerpo); tabla1.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
+        form = ctk.CTkScrollableFrame(cuerpo, width=350); form.grid(row=0, column=1, rowspan=2, sticky="nsew")
 
         self.tree_eventos = self.crear_treeview(
             tabla, ("ID", "Propietario", "Categoría", "Título", "Ubicacion", "Inicio", "Fin"),
             (70, 170, 150, 150, 150, 150, 150)
         )
         self.tree_eventos.bind("<<TreeviewSelect>>", self.cargar_evento_seleccionado)
+
+        self.tree_eventos_tareas = self.crear_treeview(
+            tabla1, ("ID", "Tarea Vencida", "Tiempo sobrepasado", "Prioridad"),
+            (40, 160, 80, 40)
+        )
 
         ctk.CTkLabel(form, text="Formulario de evento", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(10, 12))
 
@@ -935,6 +968,7 @@ class AppAgenda(ctk.CTk):
         sel = self.tree_eventos.selection()
         if not sel: return
         vals = self.tree_eventos.item(sel[0])["values"]
+        self.cargar_datosextra_eventos(vals[0])
         self.entry_ev_titulo.delete(0, tk.END); self.entry_ev_titulo.insert(0, vals[3])
         self.combo_ev_usuario.set(vals[1])
         self.combo_ev_categoria.set(vals[2])
@@ -948,6 +982,21 @@ class AppAgenda(ctk.CTk):
             self.hora_fin.delete(0, tk.END); self.hora_fin.insert(0, fin.strftime("%H:%M"))
         except ValueError:
             pass
+
+    def cargar_datosextra_eventos(self, id):
+        try:
+            rows = self.ejecutar_consulta("""
+                SELECT id_tarea, descripcion, CURRENT_DATE - fecha_limite, prioridad 
+                FROM tareas 
+                WHERE id_evento = %s AND CURRENT_DATE > fecha_limite
+                order by fecha_limite asc
+            """, (id,),fetch=True)
+            for item in self.tree_eventos_tareas.get_children(): self.tree_eventos_tareas.delete(item)
+            for row in rows:
+                self.tree_eventos_tareas.insert("", "end", values=(row[0], row[1], row[2], row[3]))
+                
+        except Exception as e:
+            print(f"Error cargando Ubicaciones: {e}")
 
     def limpiar_form_evento(self):
         self.tree_eventos.selection_remove(self.tree_eventos.selection())

@@ -716,12 +716,12 @@ class AppAgenda(ctk.CTk):
         )
         self.tree_ubicaciones.bind("<<TreeviewSelect>>", self.cargar_ubicacion_seleccionada)
         self.tree_ubicaciones_historicas = self.crear_treeview(
-            tabla_frame1, ("Historial",),
-            (160,)
+            tabla_frame1, ("Historial", "Tiempo transcurrido"),
+            (160,160)
         )
         self.tree_ubicaciones_actuales = self.crear_treeview(
             tabla_frame2, ("Proximos Eventos", "Inicio", "Fin"),
-            (160, 160, 160,)
+            (160, 160, 160)
         )
         self.tree_reporte1 = self.crear_treeview(
             tabla_frame3, ("Nombre", "Cantidad de eventos"),
@@ -763,12 +763,12 @@ class AppAgenda(ctk.CTk):
     def cargar_datosextra_ubicaciones(self, id):
         try:
             rows = self.ejecutar_consulta(
-                "SELECT titulo FROM eventos where id_ubicacion = %s order by fecha_inicio desc", (id,),
+                "SELECT titulo, date_trunc('second', fecha_fin - NOW()) FROM eventos where id_ubicacion = %s and fecha_fin < NOW() order by fecha_inicio desc", (id,),
                 fetch=True
             )
             for item in self.tree_ubicaciones_historicas.get_children(): self.tree_ubicaciones_historicas.delete(item)
             for row in rows:
-                self.tree_ubicaciones_historicas.insert("", "end", values=(row[0]))
+                self.tree_ubicaciones_historicas.insert("", "end", values=(row[0], row[1]))
                 
         except Exception as e:
             print(f"Error cargando Ubicaciones: {e}")

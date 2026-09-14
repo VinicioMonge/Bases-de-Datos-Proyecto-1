@@ -19,8 +19,8 @@ class AppAgenda(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Agenda 3 Patitos")
-        self.geometry("1280x760")
-        self.minsize(1050, 650)
+        self.geometry("1216x684")
+        self.minsize(1024, 576)
 
         self.conn_params = {
             "dbname": "agenda",
@@ -35,6 +35,7 @@ class AppAgenda(ctk.CTk):
         self.ubicaciones_combo = {}
         self.categorias_padre_combo = {}
         self.eventos_combo = {}
+        self.estados_combo = {}
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
@@ -133,8 +134,8 @@ class AppAgenda(ctk.CTk):
             ("Categorías", "📁"),
             ("Eventos", "📆"),
             ("Ubicaciones", "📌"),
-            ("Rankings", "📊"),
-            ("Tareas", "✅")
+            ("Tareas", "✅"),
+            ("Disponibilidades", "⏰")
         ], start=2):
             btn = ctk.CTkButton(
                 self.sidebar_frame, text=f"{icono}  {nombre}",
@@ -174,15 +175,15 @@ class AppAgenda(ctk.CTk):
         self.tab_categorias = self.tabview.add("Categorías")
         self.tab_eventos = self.tabview.add("Eventos")
         self.tab_ubicaciones = self.tabview.add("Ubicaciones")
-        self.tab_reportes = self.tabview.add("Rankings")
         self.tab_tareas = self.tabview.add("Tareas")
+        self.tab_disponibilidades = self.tabview.add("Disponibilidades")
         
         self.configurar_pestana_usuarios()
         self.configurar_pestana_categorias()
         self.configurar_pestana_eventos()
         self.configurar_pestana_ubicaciones()
         self.configurar_pestana_tareas()
-        self.configurar_pestana_reportes()
+        self.configurar_pestana_disponibilidades()
         self.seleccionar_modulo("Usuarios")
 
     def al_cambiar_pestana(self):
@@ -199,28 +200,287 @@ class AppAgenda(ctk.CTk):
             anchor="w", padx=15, pady=(0, 12)
         )
 
+    # ---------------- DISPONIBILIDADES -----------------
+
+    def configurar_pestana_disponibilidades(self):
+        self.crear_encabezado(self.tab_disponibilidades, "Disponibilidades", "Registra, consulta y administra las tareas pertenecientes a tu evento.")
+
+        cuerpo = ctk.CTkScrollableFrame(self.tab_disponibilidades, fg_color="transparent")
+        cuerpo.pack(fill="both", expand=True, padx=10, pady=5)
+        cuerpo.grid_columnconfigure(0, weight=3)
+        cuerpo.grid_columnconfigure(1, weight=1)
+        cuerpo.grid_rowconfigure(0, weight=1)
+        cuerpo.grid_rowconfigure(1, weight=1)
+        cuerpo.grid_rowconfigure(2, weight=1)
+
+        tabla_frame = ctk.CTkFrame(cuerpo)
+        tabla_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+
+        tabla_frame1 = ctk.CTkFrame(cuerpo)
+        tabla_frame1.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
+
+        tabla_frame2 = ctk.CTkFrame(cuerpo)
+        tabla_frame2.grid(row=2, column=0, sticky="nsew", padx=(0, 8))
+
+        form = ctk.CTkFrame(cuerpo, width=250)
+        form.grid(row=0, column=1, sticky="nsew")
+
+        form1 = ctk.CTkFrame(cuerpo, width=250)
+        form1.grid(row=2, column=1, sticky="nsew")
+
+        self.tree_disponibilidades = self.crear_treeview(
+            tabla_frame, ("ID", "Usuario", "Estado", "Fecha Inicio", "Fecha Fin"),
+            (40, 160, 120, 120, 120)
+        )
+        self.tree_disponibilidades.bind("<<TreeviewSelect>>", self.cargar_disponibilidad_seleccionado)
+
+        self.crear_encabezado(tabla_frame1, "Gestión de Tiempos", "")
+        self.tree_disponibilidades1 = self.crear_treeview(
+            tabla_frame2, ("ID", "Nombre", "Apellido"),
+            (40, 80, 80)
+        )
+
+        ctk.CTkLabel(form, text="Usuario").pack(anchor="w", padx=10, pady=(8, 2))
+        self.combo_usuario = ctk.CTkComboBox(form, values=["Seleccione un usuario"], state="readonly")
+        self.combo_usuario.set("Seleccione un usuario")
+        self.combo_usuario.pack(fill="x", padx=10, pady=4)
+
+        ctk.CTkLabel(form, text="Estado").pack(anchor="w", padx=10, pady=(8, 2))
+        self.combo_estado = ctk.CTkComboBox(form, values=["Ocupado"]+["Disponible"]+["No disponible"], state="readonly")
+        self.combo_estado.set("Seleccione un estado")
+        self.combo_estado.pack(fill="x", padx=10, pady=4)
+
+        ctk.CTkLabel(form, text="Fecha Limite").pack(anchor="w", padx=10, pady=(10, 2))
+        fila_limitei = ctk.CTkFrame(form, fg_color="transparent"); fila_limitei.pack(fill="x", padx=10)
+        self.fecha_limitei = self.crear_selector_fecha(fila_limitei)
+        self.fecha_limitei.pack(side="left", fill="x", expand=True)
+        self.hora_limitei = ctk.CTkEntry(fila_limitei, placeholder_text="HH:MM", width=75)
+        self.hora_limitei.pack(side="left", padx=(6, 0))
+
+        ctk.CTkLabel(form, text="Fecha Limite").pack(anchor="w", padx=10, pady=(10, 2))
+        fila_limitef = ctk.CTkFrame(form, fg_color="transparent"); fila_limitef.pack(fill="x", padx=10)
+        self.fecha_limitef = self.crear_selector_fecha(fila_limitef)
+        self.fecha_limitef.pack(side="left", fill="x", expand=True)
+        self.hora_limitef = ctk.CTkEntry(fila_limitef, placeholder_text="HH:MM", width=75)
+        self.hora_limitef.pack(side="left", padx=(6, 0))
+
+        ctk.CTkLabel(form1, text="Fecha Limite").pack(anchor="w", padx=10, pady=(10, 2))
+        fila_busquedai = ctk.CTkFrame(form1, fg_color="transparent"); fila_busquedai.pack(fill="x", padx=10)
+        self.fecha_busquedai = self.crear_selector_fecha(fila_busquedai)
+        self.fecha_busquedai.pack(side="left", fill="x", expand=True)
+        self.hora_busquedai = ctk.CTkEntry(fila_busquedai, placeholder_text="HH:MM", width=75)
+        self.hora_busquedai.pack(side="left", padx=(6, 0))
+
+        ctk.CTkLabel(form1, text="Fecha Limite").pack(anchor="w", padx=10, pady=(10, 2))
+        fila_busquedaf = ctk.CTkFrame(form1, fg_color="transparent"); fila_busquedaf.pack(fill="x", padx=10)
+        self.fecha_busquedaf = self.crear_selector_fecha(fila_busquedaf)
+        self.fecha_busquedaf.pack(side="left", fill="x", expand=True)
+        self.hora_busquedaf = ctk.CTkEntry(fila_busquedaf, placeholder_text="HH:MM", width=75)
+        self.hora_busquedaf.pack(side="left", padx=(6, 0))
+        
+        ctk.CTkButton(form, text="➕ Crear disponibilidad", command=self.agregar_disponibilidad).pack(fill="x", padx=10, pady=(16, 5))
+        ctk.CTkButton(form, text="💾 Actualizar disponibilidad", command=self.actualizar_disponibilidad).pack(fill="x", padx=10, pady=5)
+        ctk.CTkButton(form, text="🧹 Nuevo / Limpiar", command=self.limpiar_form_disponibilidades, fg_color="gray").pack(fill="x", padx=10, pady=5)
+        ctk.CTkButton(form, text="🗑️ Eliminar seleccionado", command=self.eliminar_disponibilidad, fg_color="#b33939", hover_color="#8f2d2d").pack(fill="x", padx=10, pady=5)
+
+        ctk.CTkButton(form1, text="🔍 Buscar", command=self.cargar_datosextra_disponibilidades).pack(fill="x", padx=10, pady=(16, 5))
+        ctk.CTkButton(form1, text="🧹 Nuevo / Limpiar", command=self.limpiar_form_disponibilidades1, fg_color="gray").pack(fill="x", padx=10, pady=5)
+
+        self.limpiar_form_disponibilidades()
+        self.limpiar_form_disponibilidades1()
+
+    def limpiar_form_disponibilidades(self):
+        self.tree_disponibilidades.selection_remove(self.tree_disponibilidades.selection())
+        self.combo_estado.set("Seleccione un estado")
+        self.combo_usuario.set("Seleccione un usuario")
+        hoy = datetime.now()
+        self.establecer_fecha(self.fecha_limitei, hoy)
+        self.hora_limitei.delete(0, tk.END); self.hora_limitei.insert(0, "09:00")
+        self.establecer_fecha(self.fecha_limitef, hoy)
+        self.hora_limitef.delete(0, tk.END); self.hora_limitef.insert(0, "09:00")
+
+    def limpiar_form_disponibilidades1(self):
+        hoy = datetime.now()
+        self.establecer_fecha(self.fecha_busquedai, hoy)
+        self.hora_busquedai.delete(0, tk.END); self.hora_busquedai.insert(0, "09:00")
+        self.establecer_fecha(self.fecha_busquedaf, hoy)
+        self.hora_busquedaf.delete(0, tk.END); self.hora_busquedaf.insert(0, "09:00")
+        for item in self.tree_disponibilidades1.get_children(): self.tree_disponibilidades1.delete(item)
+
+    def cargar_datos_disponibilidades(self):
+        try:
+            rows = self.ejecutar_consulta("""
+                SELECT 
+                    d.id_disponibilidad, 
+                    u.nombre, u.apellido, u.id_usuario, 
+                    t.nombre, t.id_tipo,
+                    d.fecha_inicio, d.fecha_fin
+                    
+                    FROM disponibilidades d
+                    JOIN usuarios u ON u.id_usuario = d.usuario
+                    JOIN tipos_disponibilidad t on t.id_tipo = d.estado
+                    ORDER BY d.id_disponibilidad ASC
+            """, fetch=True)
+            for item in self.tree_disponibilidades.get_children(): self.tree_disponibilidades.delete(item)
+            #self.estados_combo = {}
+            for row in rows:
+                usuario = f"{row[1]} {row[2]} — #{row[3]}"
+                estado = f"{row[4]} — #{row[5]}"
+                inicio = row[6].strftime("%Y-%m-%d %H:%M") if hasattr(row[6], "strftime") else row[6]
+                fin = row[7].strftime("%Y-%m-%d %H:%M") if hasattr(row[7], "strftime") else row[7]
+                self.tree_disponibilidades.insert("", "end", values=(row[0], usuario, estado, inicio, fin))
+                #self.estados_combo[estado] = row[5]
+
+            rows = self.ejecutar_consulta("""
+                SELECT 
+                    nombre,
+                    id_tipo  
+                FROM tipos_disponibilidad
+            """, fetch=True)
+            self.estados_combo = {}
+            for row in rows:
+                estado = f"{row[0]} — #{row[1]}"
+                self.estados_combo[estado] = row[1]
+
+            valores_u = ["Seleccione un usuario"] + list(self.usuarios_combo.keys())
+            valores_e = ["Seleccione un estado"] + list(self.estados_combo.keys())
+
+            self.combo_usuario.configure(values=valores_u)
+            self.combo_estado.configure(values=valores_e)
+
+        except Exception as e:
+            print(f"Error cargando eventos: {e}")
+
+    def cargar_datosextra_disponibilidades(self):
+        inicio = datetime.strptime(f"{self.obtener_fecha(self.fecha_busquedai)} {self.hora_busquedai.get().strip()}", "%Y-%m-%d %H:%M")
+        fin = datetime.strptime(f"{self.obtener_fecha(self.fecha_busquedaf)} {self.hora_busquedaf.get().strip()}", "%Y-%m-%d %H:%M")
+        try:
+            rows = self.ejecutar_consulta("""
+                SELECT nombre, apellido, id_usuario
+                    FROM usuarios u
+                    WHERE NOT EXISTS (
+                        SELECT 1 
+                        FROM disponibilidades d 
+                        WHERE u.id_usuario = d.usuario
+                            and estado != 1
+                            AND d.fecha_inicio <= %s
+                            AND d.fecha_fin >= %s
+                    )
+                    order by id_usuario ASC
+            """, (fin, inicio), fetch=True)
+            for item in self.tree_disponibilidades1.get_children(): self.tree_disponibilidades1.delete(item)
+            for row in rows:
+                self.tree_disponibilidades1.insert("", "end", values=(row[2], row[0], row[1]))
+        except Exception as e:
+            print(f"Error cargando eventos: {e}")
+
+    def cargar_disponibilidad_seleccionado(self, _=None):
+        sel = self.tree_disponibilidades.selection()
+        if not sel: return
+        vals = self.tree_disponibilidades.item(sel[0])["values"]
+        self.combo_usuario.set(vals[1])
+        self.combo_estado.set(vals[2])
+        try:
+            limite = datetime.strptime(str(vals[3]), "%Y-%m-%d %H:%M")
+            self.establecer_fecha(self.fecha_limitei, limite)
+            self.hora_limitei.delete(0, tk.END); self.hora_limitei.insert(0, limite.strftime("%H:%M"))
+
+            limite1 = datetime.strptime(str(vals[4]), "%Y-%m-%d %H:%M")
+            self.establecer_fecha(self.fecha_limitef, limite1)
+            self.hora_limitef.delete(0, tk.END); self.hora_limitef.insert(0, limite1.strftime("%H:%M"))
+        except ValueError:
+            pass
+
+    def datos_disponibilidad_formulario(self):
+            usuario = self.usuarios_combo.get(self.combo_usuario.get())
+            estado = self.estados_combo.get(self.combo_estado.get())
+            try:
+                limite = datetime.strptime(f"{self.obtener_fecha(self.fecha_limitei)} {self.hora_limitei.get().strip()}", "%Y-%m-%d %H:%M")
+                limite1 = datetime.strptime(f"{self.obtener_fecha(self.fecha_limitef)} {self.hora_limitef.get().strip()}", "%Y-%m-%d %H:%M")
+            except ValueError:
+                raise ValueError("La hora debe tener formato HH:MM, por ejemplo 09:30.")
+            if usuario is None or estado is None:
+                raise ValueError("Completa título, propietario y categoría.")
+            return usuario, estado, limite, limite1
+    
+    def agregar_disponibilidad(self):
+        try:
+            datos = self.datos_disponibilidad_formulario()
+            self.ejecutar_consulta("""
+                INSERT INTO disponibilidades (usuario, estado, fecha_inicio, fecha_fin)
+                VALUES (%s, %s, %s, %s);        
+                """, datos)
+            self.limpiar_form_disponibilidades(); self.cargar_datos_disponibilidades()
+            messagebox.showinfo("Éxito", "Disponibilidad creada correctamente.")
+        except Exception as e:
+            messagebox.showerror("No se pudo crear la disponibilidad", str(e))
+
+    def disponibilidad_seleccionada_id(self):
+        sel = self.tree_disponibilidades.selection()
+        return self.tree_disponibilidades.item(sel[0])["values"][0] if sel else None
+
+    def eliminar_disponibilidad(self):
+            uid = self.disponibilidad_seleccionada_id()
+            if uid is None:
+                return messagebox.showwarning("Selección requerida", "Selecciona una tarea.")
+            if not messagebox.askyesno("Confirmar", "¿Eliminar la disponibilidad seleccionada?"):
+                return
+            try:
+                self.ejecutar_consulta("DELETE FROM disponibilidades WHERE id_disponibilidad=%s", (uid,))
+                self.limpiar_form_disponibilidades(); self.actualizar_todas_las_tablas()
+                messagebox.showinfo("Eliminada", "Disponibilidad eliminada.")
+            except Exception as e:
+                messagebox.showerror("No se pudo eliminar", str(e))     
+
+    def actualizar_disponibilidad(self):
+        eid = self.disponibilidad_seleccionada_id()
+        if eid is None: return messagebox.showwarning("Selección requerida", "Selecciona una tarea.")
+        try:
+            usuario, estado, inicio, fin = self.datos_disponibilidad_formulario()
+            self.ejecutar_consulta("""
+                UPDATE disponibilidades SET 
+                usuario =%s, 
+                estado =%s, 
+                fecha_inicio =%s, 
+                fecha_fin =%s
+                WHERE id_disponibilidad=%s
+            """, (usuario, estado, inicio, fin, eid))
+            self.cargar_datos_disponibilidades(); messagebox.showinfo("Éxito", "Tarea actualizada.")
+        except Exception as e:
+            messagebox.showerror("No se pudo actualizar", str(e))
+
     # -------------------- TAREAS -----------------
 
     def configurar_pestana_ubicaciones(self):
         self.crear_encabezado(self.tab_tareas, "Tareas", "Registra, consulta y administra las tareas pertenecientes a tu evento.")
 
-        cuerpo = ctk.CTkFrame(self.tab_tareas, fg_color="transparent")
+        cuerpo = ctk.CTkScrollableFrame(self.tab_tareas, fg_color="transparent")
         cuerpo.pack(fill="both", expand=True, padx=10, pady=5)
-        cuerpo.grid_columnconfigure(0, weight=1)
+        cuerpo.grid_columnconfigure(0, weight=2)
         cuerpo.grid_columnconfigure(1, weight=1)
         cuerpo.grid_rowconfigure(0, weight=1)
+        cuerpo.grid_rowconfigure(1, weight=1)
 
         tabla_frame = ctk.CTkFrame(cuerpo)
         tabla_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
 
-        form = ctk.CTkScrollableFrame(cuerpo, width=350)
-        form.grid(row=0, column=1, sticky="nsew")
+        tabla_frame1 = ctk.CTkFrame(cuerpo)
+        tabla_frame1.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
+
+        form = ctk.CTkFrame(cuerpo, width=350)
+        form.grid(row=0, column=1, rowspan=2, sticky="nsew")
 
         self.tree_tareas = self.crear_treeview(
             tabla_frame, ("ID", "Evento", "Responsable", "Titulo", "Descripcion", "Fecha Limite", "Prioridad", "Estado"),
-            (70, 80, 160, 80, 160, 160, 80, 80)
+            (40, 100, 160, 80, 160, 120, 80, 80)
         )
         self.tree_tareas.bind("<<TreeviewSelect>>", self.cargar_tarea_seleccionado)
+
+        self.crear_encabezado(tabla_frame1, "Reporte de Carga de Trabajo", "")
+        self.tree_tareas1 = self.crear_treeview(
+            tabla_frame1, ("Responsable", "Pendientes", "Iniciadas", "Vencidas"),
+            (160, 80, 80, 80)
+        )
 
         ctk.CTkLabel(form, text="Formulario de tarea", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(10, 15))
 
@@ -287,7 +547,7 @@ class AppAgenda(ctk.CTk):
         self.combo_ev_estado.set(vals[7])
         try:
             limite = datetime.strptime(str(vals[5]), "%Y-%m-%d %H:%M")
-            self.establecer_fecha(self.fecha_inicio, limite)
+            self.establecer_fecha(self.fecha_limite, limite)
             self.hora_limite.delete(0, tk.END); self.hora_limite.insert(0, limite.strftime("%H:%M"))
         except ValueError:
             pass
@@ -387,6 +647,27 @@ class AppAgenda(ctk.CTk):
         except Exception as e:
             messagebox.showerror("No se pudo actualizar", str(e))
         
+    def cargar_reporte_tareas(self):
+        try:
+            rows = self.ejecutar_consulta("""
+                select 
+                    u.nombre,
+                    u.apellido,
+                    u.id_usuario,
+                    COUNT(*) FILTER (WHERE t.estado = 'Pendiente'), 
+                    COUNT(*) FILTER (WHERE t.estado = 'En progreso'), 
+                    COUNT(*) FILTER (WHERE t.fecha_limite < CURRENT_DATE)
+                from tareas t, usuarios u
+                where t.responsable = u.id_usuario
+                group by u.id_usuario
+            """,fetch=True)
+            for item in self.tree_tareas1.get_children(): self.tree_tareas1.delete(item)
+            for row in rows:
+                usuario = f"{row[0]} {row[1]} — #{row[2]}"
+                self.tree_tareas1.insert("", "end", values=(usuario, row[3], row[4], row[5]))  
+        except Exception as e:
+            print(f"Error cargando Ubicaciones: {e}")
+
     # -------------------- UBICACIONES -----------------
 
     def configurar_pestana_tareas(self):
@@ -394,7 +675,7 @@ class AppAgenda(ctk.CTk):
         self.crear_encabezado(self.tab_ubicaciones, "Ubicaciones", "Registra, consulta y administra las ubicaciones para tus eventos.")
 
         # Crea una tabla y se definen las filas y columnas. Se expanden al tamaño de la pantalla
-        cuerpo = ctk.CTkFrame(self.tab_ubicaciones, fg_color="transparent")
+        cuerpo = ctk.CTkScrollableFrame(self.tab_ubicaciones, fg_color="transparent")
         cuerpo.pack(fill="both", expand=True, padx=10, pady=5)
 
         cuerpo.grid_columnconfigure(0, weight=1)
@@ -403,6 +684,7 @@ class AppAgenda(ctk.CTk):
         cuerpo.grid_columnconfigure(3, weight=1)
         cuerpo.grid_rowconfigure(0, weight=1)
         cuerpo.grid_rowconfigure(1, weight=1)
+        cuerpo.grid_rowconfigure(2, weight=1)
 
         # Crea la seccion donde iran los botones y los campos de texto
         tabla_frame = ctk.CTkFrame(cuerpo)
@@ -412,9 +694,18 @@ class AppAgenda(ctk.CTk):
         tabla_frame1.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
 
         tabla_frame2 = ctk.CTkFrame(cuerpo)
-        tabla_frame2.grid(row=1, column=1, sticky="nsew", padx=(0, 8))
+        tabla_frame2.grid(row=1, column=1, columnspan=2, sticky="nsew", padx=(0, 8))
 
-        form = ctk.CTkScrollableFrame(cuerpo, width=250)
+        tabla_frame3 = ctk.CTkFrame(cuerpo)
+        tabla_frame3.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=(0, 8))
+
+        tabla_frame4= ctk.CTkFrame(cuerpo)
+        tabla_frame4.grid(row=2, column=2, columnspan=2, sticky="nsew", padx=(0, 8))
+
+        self.crear_encabezado(tabla_frame3, "Recintos más solicitados", "")
+        self.crear_encabezado(tabla_frame4, "Mayor volumen de eventos", "")
+
+        form = ctk.CTkFrame(cuerpo, width=250)
         form.grid(row=0, column=3, rowspan=2, sticky="nsew")
 
 
@@ -424,17 +715,22 @@ class AppAgenda(ctk.CTk):
             (70, 160, 160, 160, 80)
         )
         self.tree_ubicaciones.bind("<<TreeviewSelect>>", self.cargar_ubicacion_seleccionada)
-
         self.tree_ubicaciones_historicas = self.crear_treeview(
             tabla_frame1, ("Historial",),
             (160,)
         )
-
         self.tree_ubicaciones_actuales = self.crear_treeview(
             tabla_frame2, ("Proximos Eventos", "Inicio", "Fin"),
             (160, 160, 160,)
         )
-        
+        self.tree_reporte1 = self.crear_treeview(
+            tabla_frame3, ("Nombre", "Cantidad de eventos"),
+            (150, 150)
+        )
+        self.tree_reporte2 = self.crear_treeview(
+            tabla_frame4, ("Nombre", "Total de visitantes"),
+            (150, 150)
+        )
 
         # Cuadros de texto
         ctk.CTkLabel(form, text="Formulario de ubicación", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(10, 15))
@@ -563,34 +859,6 @@ class AppAgenda(ctk.CTk):
         except Exception as e:
             messagebox.showerror("No se pudo eliminar", str(e))
 
-    # -------------------- REPORTES --------------------
-
-    def configurar_pestana_reportes(self):
-        self.crear_encabezado(self.tab_reportes, "Ranking", "Consulta sobre los recintos mas solicitados y con mayor volumen de eventos.")
-
-        cuerpo = ctk.CTkFrame(self.tab_reportes, fg_color="transparent")
-        cuerpo.pack(fill="both", expand=True, padx=10, pady=5)
-
-        cuerpo.grid_columnconfigure(0, weight=1)
-        cuerpo.grid_columnconfigure(1, weight=1)
-        cuerpo.grid_rowconfigure(0, weight=1)
-
-        tabla_frame = ctk.CTkFrame(cuerpo)
-        tabla_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
-
-        tabla_frame1 = ctk.CTkFrame(cuerpo)
-        tabla_frame1.grid(row=0, column=1, sticky="nsew", padx=(0, 8))
-
-        self.tree_reporte1 = self.crear_treeview(
-            tabla_frame, ("Nombre", "Cantidad de eventos"),
-            (150, 150)
-        )
-
-        self.tree_reporte2 = self.crear_treeview(
-            tabla_frame1, ("Nombre", "Total de visitantes"),
-            (150, 150)
-        )
-
     def cargar_datos_reportes(self):
         try:
             rows = self.ejecutar_consulta("""
@@ -630,15 +898,15 @@ class AppAgenda(ctk.CTk):
         cuerpo.grid_columnconfigure(0, weight=3)
         cuerpo.grid_columnconfigure(1, weight=1)
         #los pesos de las filas estan invertidos?
-        cuerpo.grid_rowconfigure(0, weight=1)
-        cuerpo.grid_rowconfigure(1, weight=3)
+        cuerpo.grid_rowconfigure(0, weight=3)
+        cuerpo.grid_rowconfigure(1, weight=1)
 
         tabla_frame = ctk.CTkFrame(cuerpo)
         tabla_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
         tabla_frame1 = ctk.CTkFrame(cuerpo)
         tabla_frame1.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
         form = ctk.CTkScrollableFrame(cuerpo, width=300)
-        form.grid(row=0, column=1, rowspan=2, sticky="nsew")
+        form.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(0, 15))
 
         self.tree_usuarios = self.crear_treeview(
             tabla_frame, ("ID", "Nombre", "Apellido", "Registro", "Activo"),
@@ -686,7 +954,7 @@ class AppAgenda(ctk.CTk):
     def cargar_datosextra_usuarios(self, id):
         try:
             rows = self.ejecutar_consulta(
-                "SELECT id_tarea, descripcion, fecha_limite - CURRENT_DATE, prioridad FROM tareas where responsable = %s AND CURRENT_DATE < fecha_limite order by fecha_limite desc", (id,),
+                "SELECT id_tarea, descripcion, date_trunc('second', fecha_limite - NOW()), prioridad FROM tareas where responsable = %s AND NOW()::timestamp < fecha_limite order by fecha_limite desc", (id,),
                 fetch=True
             )
             for item in self.tree_usuarios_tareas.get_children(): self.tree_usuarios_tareas.delete(item)
@@ -986,9 +1254,9 @@ class AppAgenda(ctk.CTk):
     def cargar_datosextra_eventos(self, id):
         try:
             rows = self.ejecutar_consulta("""
-                SELECT id_tarea, descripcion, CURRENT_DATE - fecha_limite, prioridad 
+                SELECT id_tarea, descripcion, date_trunc('second', NOW() - fecha_limite), prioridad 
                 FROM tareas 
-                WHERE id_evento = %s AND CURRENT_DATE > fecha_limite
+                WHERE id_evento = %s AND NOW()::timestamp > fecha_limite
                 order by fecha_limite asc
             """, (id,),fetch=True)
             for item in self.tree_eventos_tareas.get_children(): self.tree_eventos_tareas.delete(item)
@@ -1105,6 +1373,8 @@ class AppAgenda(ctk.CTk):
         self.cargar_datos_eventos()
         self.cargar_datos_reportes()
         self.cargar_datos_tareas()
+        self.cargar_reporte_tareas()
+        self.cargar_datos_disponibilidades()
 
 
 if __name__ == "__main__":

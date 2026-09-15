@@ -401,6 +401,8 @@ class AppAgenda(ctk.CTk):
                 raise ValueError("La hora debe tener formato HH:MM, por ejemplo 09:30.")
             if usuario is None or estado is None:
                 raise ValueError("Completa título, propietario y categoría.")
+            if limite1 <= limite:
+                raise ValueError("La fecha y hora de finalización deben ser posteriores al inicio.")
             return usuario, estado, limite, limite1
     
     def agregar_disponibilidad(self):
@@ -456,7 +458,7 @@ class AppAgenda(ctk.CTk):
 
         cuerpo = ctk.CTkScrollableFrame(self.tab_tareas, fg_color="transparent")
         cuerpo.pack(fill="both", expand=True, padx=10, pady=5)
-        cuerpo.grid_columnconfigure(0, weight=2)
+        cuerpo.grid_columnconfigure(0, weight=3)
         cuerpo.grid_columnconfigure(1, weight=1)
         cuerpo.grid_rowconfigure(0, weight=1)
         cuerpo.grid_rowconfigure(1, weight=1)
@@ -471,8 +473,8 @@ class AppAgenda(ctk.CTk):
         form.grid(row=0, column=1, rowspan=2, sticky="nsew")
 
         self.tree_tareas = self.crear_treeview(
-            tabla_frame, ("ID", "Evento", "Responsable", "Titulo", "Descripcion", "Fecha Limite", "Prioridad", "Estado"),
-            (40, 100, 160, 80, 160, 120, 80, 80)
+            tabla_frame, ("ID", "Evento", "Responsable", "Titulo", "Fecha Limite", "Prioridad", "Estado"),
+            (40, 100, 160, 80, 120, 80, 80)
         )
         self.tree_tareas.bind("<<TreeviewSelect>>", self.cargar_tarea_seleccionado)
 
@@ -486,8 +488,6 @@ class AppAgenda(ctk.CTk):
 
         self.entry_titulo = ctk.CTkEntry(form, placeholder_text="Titulo")
         self.entry_titulo.pack(fill="x", padx=10, pady=6)
-        self.entry_descripcion = ctk.CTkEntry(form, placeholder_text="Descripcion")
-        self.entry_descripcion.pack(fill="x", padx=10, pady=6)
 
         ctk.CTkLabel(form, text="Evento").pack(anchor="w", padx=10, pady=(8, 2))
         self.combo_ev_evento = ctk.CTkComboBox(form, values=["Seleccione un evento"], state="readonly")
@@ -526,7 +526,6 @@ class AppAgenda(ctk.CTk):
     def limpiar_form_tareas(self):
         self.tree_tareas.selection_remove(self.tree_tareas.selection())
         self.entry_titulo.delete(0, tk.END)
-        self.entry_descripcion.delete(0, tk.END)
         self.combo_ev_evento.set("Seleccione un evento")
         self.combo_ev_resposable.set("Seleccione un responsable")
         self.combo_ev_prioridad.set("Seleccione la prioridad")
@@ -540,13 +539,12 @@ class AppAgenda(ctk.CTk):
         if not sel: return
         vals = self.tree_tareas.item(sel[0])["values"]
         self.entry_titulo.delete(0, tk.END); self.entry_titulo.insert(0, vals[3])
-        self.entry_descripcion.delete(0, tk.END); self.entry_descripcion.insert(0, vals[4])
         self.combo_ev_evento.set(vals[1])
         self.combo_ev_resposable.set(vals[2])
-        self.combo_ev_prioridad.set(vals[6])
-        self.combo_ev_estado.set(vals[7])
+        self.combo_ev_prioridad.set(vals[5])
+        self.combo_ev_estado.set(vals[6])
         try:
-            limite = datetime.strptime(str(vals[5]), "%Y-%m-%d %H:%M")
+            limite = datetime.strptime(str(vals[4]), "%Y-%m-%d %H:%M")
             self.establecer_fecha(self.fecha_limite, limite)
             self.hora_limite.delete(0, tk.END); self.hora_limite.insert(0, limite.strftime("%H:%M"))
         except ValueError:
@@ -571,7 +569,7 @@ class AppAgenda(ctk.CTk):
                 usuario = f"{row[4]} {row[5]} — #{row[3]}"
                 evento = f"{row[2]} — #{row[1]}"
                 limite = row[8].strftime("%Y-%m-%d %H:%M") if hasattr(row[8], "strftime") else row[8]
-                self.tree_tareas.insert("", "end", values=(row[0], evento, usuario, row[6], row[7], limite, row[9], row[10]))
+                self.tree_tareas.insert("", "end", values=(row[0], evento, usuario, row[6], limite, row[9], row[10]))
 
             valores_u = ["Seleccione un responsable"] + list(self.usuarios_combo.keys())
             valores_e = ["Seleccione un evento"] + list(self.eventos_combo.keys())
@@ -601,7 +599,6 @@ class AppAgenda(ctk.CTk):
 
     def datos_tarea_formulario(self):
             titulo = self.entry_titulo.get().strip()
-            descripcion = self.entry_descripcion.get().strip()
             usuario = self.usuarios_combo.get(self.combo_ev_resposable.get())
             evento = self.eventos_combo.get(self.combo_ev_evento.get())
             prioridad = self.combo_ev_prioridad.get().strip();
@@ -611,16 +608,16 @@ class AppAgenda(ctk.CTk):
                 limite = datetime.strptime(f"{self.obtener_fecha(self.fecha_limite)} {self.hora_limite.get().strip()}", "%Y-%m-%d %H:%M")
             except ValueError:
                 raise ValueError("La hora debe tener formato HH:MM, por ejemplo 09:30.")
-            if not titulo or not descripcion or usuario is None or evento is None:
+            if not titulo or usuario is None or evento is None:
                 raise ValueError("Completa título, propietario y categoría.")
-            return evento, usuario, titulo, descripcion, limite, prioridad, estado
+            return evento, usuario, titulo, limite, prioridad, estado
     
     def agregar_tarea(self):
         try:
             datos = self.datos_tarea_formulario()
             self.ejecutar_consulta("""
                 INSERT INTO tareas(id_evento, responsable, titulo, descripcion, fecha_limite, prioridad, estado) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s);        
+                VALUES (%s, %s, %s, null, %s, %s, %s);        
                 """, datos)
             self.limpiar_form_tareas(); self.cargar_datos_tareas()
             messagebox.showinfo("Éxito", "Evento creado correctamente.")
@@ -631,18 +628,17 @@ class AppAgenda(ctk.CTk):
         eid = self.tarea_seleccionada_id()
         if eid is None: return messagebox.showwarning("Selección requerida", "Selecciona una tarea.")
         try:
-            evento, usuario, titulo, descripcion, limite, prioridad, estado = self.datos_tarea_formulario()
+            evento, usuario, titulo, limite, prioridad, estado = self.datos_tarea_formulario()
             self.ejecutar_consulta("""
                 UPDATE tareas SET 
                 id_evento=%s,
                 responsable=%s, 
-                titulo=%s, 
-                descripcion=%s, 
+                titulo=%s,
                 fecha_limite=%s, 
                 prioridad=%s, 
                 estado=%s 
                 WHERE id_tarea=%s
-            """, (evento, usuario, titulo, descripcion, limite, prioridad, estado, eid))
+            """, (evento, usuario, titulo, limite, prioridad, estado, eid))
             self.cargar_datos_tareas(); messagebox.showinfo("Éxito", "Tarea actualizada.")
         except Exception as e:
             messagebox.showerror("No se pudo actualizar", str(e))
@@ -712,24 +708,24 @@ class AppAgenda(ctk.CTk):
         # Crea la tabla donde se visualizan los datos
         self.tree_ubicaciones = self.crear_treeview(
             tabla_frame, ("ID", "Nombre", "Direccion", "Ciudad", "Capacidad"),
-            (70, 160, 160, 160, 80)
+            (40, 80, 160, 80, 40)
         )
         self.tree_ubicaciones.bind("<<TreeviewSelect>>", self.cargar_ubicacion_seleccionada)
         self.tree_ubicaciones_historicas = self.crear_treeview(
             tabla_frame1, ("Historial", "Tiempo transcurrido"),
-            (160,160)
+            (140,140)
         )
         self.tree_ubicaciones_actuales = self.crear_treeview(
             tabla_frame2, ("Proximos Eventos", "Inicio", "Fin"),
-            (160, 160, 160)
+            (140, 140, 140)
         )
         self.tree_reporte1 = self.crear_treeview(
             tabla_frame3, ("Nombre", "Cantidad de eventos"),
-            (150, 150)
+            (140, 140)
         )
         self.tree_reporte2 = self.crear_treeview(
             tabla_frame4, ("Nombre", "Total de visitantes"),
-            (150, 150)
+            (140, 140)
         )
 
         # Cuadros de texto

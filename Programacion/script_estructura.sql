@@ -166,6 +166,7 @@ create table prototipo.disponibilidades (
 	estado int4 not null,
 	fecha_inicio timestamptz not null,
 	fecha_fin timestamptz not null,
+	constraint check_fechas_disponibilidades check ((fecha_fin > fecha_inicio)),
 	constraint disponibilidades_estado_not_null not null estado,
 	constraint disponibilidades_fecha_fin_not_null not null fecha_fin,
 	constraint disponibilidades_fecha_inicio_not_null not null fecha_inicio,
@@ -260,7 +261,7 @@ BEGIN
 	    SELECT COUNT(*) FROM eventos 
 	    WHERE id_ubicacion = new.id_ubicacion
 	    AND fecha_inicio < new.fecha_fin
-	    AND fecha_fin = new.fecha_inicio
+	    AND fecha_fin > new.fecha_inicio
 	) > 0
 	THEN
         RAISE EXCEPTION 'En esta ubicacion, un evento choca con la hora seleccionada.';
@@ -271,5 +272,5 @@ $function$
 ;
 
 CREATE TRIGGER trg_evitar_ubicacion
-BEFORE INSERT OR UPDATE ON eventos
+BEFORE INSERT ON eventos
 FOR EACH ROW EXECUTE FUNCTION prototipo.evitar_ubicacion_repetida()
